@@ -429,6 +429,26 @@ func (q *Query) PhotoByUUID(photoUUID string) (photo entity.Photo, err error) {
 	return photo, nil
 }
 
+// PhotoByFilename returns a Photo based on the its original pathname.
+func (q *Query) PhotosByFilenames(photoFilenames []string) (results PhotoResults, count int, err error) {
+	s := q.db.NewScope(nil).DB()
+
+	s = s.Table("photos").
+		Select(`photos.*,
+	files.id AS file_id, files.file_uuid, files.file_primary, files.file_missing, files.file_name, files.file_hash
+	`).
+		Joins("JOIN files ON files.photo_id = photos.id AND files.file_type = 'jpg' AND files.file_missing = 0 AND files.deleted_at IS NULL").
+		Group("photos.id, files.id")
+
+	s = s.Where("files.file_name IN (?)", photoFilenames)
+
+	if err := s.Scan(&results).Error; err != nil {
+		return results, 0, err
+	}
+
+	return results, len(results), nil
+}
+
 // PreloadPhotoByUUID returns a Photo based on the UUID with all dependencies preloaded.
 func (q *Query) PreloadPhotoByUUID(photoUUID string) (photo entity.Photo, err error) {
 	if err := q.db.Unscoped().Where("photo_uuid = ?", photoUUID).

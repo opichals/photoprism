@@ -85,6 +85,10 @@ func (q *Query) Albums(f form.AlbumSearch) (results []AlbumResult, err error) {
 		s = s.Where("LOWER(albums.album_name) LIKE ?", likeString)
 	}
 
+	if f.Name != "" {
+		s = s.Where("albums.album_name = ?", f.Name)
+	}
+
 	if f.Favorites {
 		s = s.Where("albums.album_favorite = 1")
 	}
