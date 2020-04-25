@@ -42,29 +42,46 @@ func albumAction(ctx *cli.Context) error {
 
 	db := conf.Db()
 	q := query.New(db)
-	result, err := q.Albums(form.AlbumSearch{Name: ctx.String("album")})
+	albumResults, err := q.Albums(form.AlbumSearch{Name: ctx.String("album")})
 
 	if err != nil {
 		log.Errorf("album: %s", err)
 		return nil
 	}
-	a := result[0]
 
-	log.Debugf("Album %+v\n", a.AlbumName)
+	var albumName string
+	var albumUUID string
+	if len(albumResults) > 0 {
+		a := albumResults[0]
+
+		albumName = a.AlbumName
+		albumUUID = a.AlbumUUID
+	} else {
+		// try creating the album if not found
+		a := entity.NewAlbum(ctx.String("album"))
+
+		if err := db.Create(a).Error; err != nil {
+			log.Errorf("create album: %s", err)
+			return nil
+		}
+
+		albumName = a.AlbumName
+		albumUUID = a.AlbumUUID
+		log.Infof("new album created %s\n", albumName)
+	}
 
 	photos, _, err := q.PhotosByFilenames(ctx.Args())
-	log.Debugf("Photo %+v\n", photos[0].PhotoTitle)
 
 	var added []*entity.PhotoAlbum
 
 	for _, p := range photos {
-		added = append(added, entity.NewPhotoAlbum(p.PhotoUUID, a.AlbumUUID).FirstOrCreate(db))
+		added = append(added, entity.NewPhotoAlbum(p.PhotoUUID, albumUUID).FirstOrCreate(db))
 	}
 
 	if len(added) == 1 {
-		log.Info(fmt.Sprintf("one photo added to %s", a.AlbumName))
+		log.Info(fmt.Sprintf("one photo added to %s", albumName))
 	} else {
-		log.Info(fmt.Sprintf("%d photos added to %s", len(added), a.AlbumName))
+		log.Info(fmt.Sprintf("%d photos added to %s", len(added), albumName))
 	}
 	return nil
 }
